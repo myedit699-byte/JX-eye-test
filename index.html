@@ -3,101 +3,94 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>JX EYE SCROLL</title>
 
 <style>
-* {
-  box-sizing: border-box;
-}
+* { box-sizing:border-box; }
 
 body {
-  margin: 0;
-  background: #090612;
-  color: white;
-  font-family: Arial, sans-serif;
-  padding: 20px;
+  margin:0;
+  padding:20px;
+  background:#090612;
+  color:white;
+  font-family:Arial,sans-serif;
 }
 
 header {
-  text-align: center;
-  color: #bb86fc;
-  font-size: 25px;
-  font-weight: bold;
-  margin: 15px 0 25px;
+  text-align:center;
+  color:#c084fc;
+  font-size:25px;
+  font-weight:bold;
+  margin:15px 0;
 }
 
 .subtitle {
-  text-align: center;
-  color: #aaa;
-  font-size: 12px;
-  margin-bottom: 25px;
+  text-align:center;
+  color:#aaa;
+  font-size:12px;
+  margin-bottom:22px;
 }
 
 .camera {
-  background: #1b1230;
-  border: 1px solid #7543b5;
-  border-radius: 20px;
-  padding: 15px;
-  text-align: center;
+  background:#1b1230;
+  border:1px solid #7543b5;
+  border-radius:20px;
+  padding:12px;
+  text-align:center;
 }
 
 video {
-  width: 100%;
-  border-radius: 12px;
-  background: #080510;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
+  width:100%;
+  border-radius:12px;
+  background:#080510;
+  aspect-ratio:4/3;
+  object-fit:cover;
+  transform:scaleX(-1);
 }
 
 .status {
-  color: #c084fc;
-  margin: 15px 0;
-  font-size: 13px;
+  color:#c084fc;
+  margin:15px 0;
+  font-size:13px;
 }
 
 button {
-  width: 100%;
-  border: none;
-  padding: 15px;
-  border-radius: 12px;
-  background: #8b42d6;
-  color: white;
-  font-weight: bold;
-  font-size: 15px;
-  margin-top: 10px;
-}
-
-button:active {
-  background: #6426a5;
+  width:100%;
+  padding:15px;
+  margin-top:10px;
+  border:0;
+  border-radius:12px;
+  background:#8b42d6;
+  color:white;
+  font-weight:bold;
 }
 
 .panel {
-  background: #171025;
-  border-radius: 15px;
-  padding: 17px;
-  margin-top: 18px;
+  background:#171025;
+  border-radius:15px;
+  padding:17px;
+  margin-top:18px;
 }
 
-.panel h3 {
-  color: #c084fc;
-  font-size: 15px;
-}
+.panel h3 { color:#c084fc; }
 
 .info {
-  display: flex;
-  justify-content: space-between;
-  margin: 15px 0;
-  color: #ccc;
-  font-size: 13px;
+  display:flex;
+  justify-content:space-between;
+  margin:15px 0;
+  font-size:13px;
+  color:#ccc;
 }
 
-.off {
-  color: #ff7777;
-}
+.on { color:#64e6a0; }
+.off { color:#ff7777; }
 
-.on {
-  color: #64e6a0;
+.counter {
+  font-size:30px;
+  color:#c084fc;
+  text-align:center;
+  margin:15px;
 }
 </style>
 </head>
@@ -117,78 +110,201 @@ AI POWERED EYE GESTURE CONTROL
     CAMERA NOT STARTED
   </div>
 
-  <button onclick="startCamera()">
-    START CAMERA
-  </button>
-
-  <button onclick="stopCamera()">
-    STOP CAMERA
-  </button>
+  <button id="start">START AI SCANNER</button>
+  <button id="stop">STOP SCANNER</button>
 </div>
 
 <div class="panel">
-  <h3>SYSTEM STATUS</h3>
+  <h3>AI DETECTION</h3>
 
   <div class="info">
-    <span>Camera</span>
-    <span id="cameraStatus" class="off">OFF</span>
+    <span>Face Detection</span>
+    <span id="face" class="off">WAITING</span>
   </div>
 
   <div class="info">
     <span>Eye Detection</span>
-    <span class="off">NOT CONNECTED</span>
+    <span id="eye" class="off">WAITING</span>
   </div>
 
   <div class="info">
-    <span>Auto Scroll</span>
-    <span class="off">DISABLED</span>
+    <span>Eye Expression</span>
+    <span id="expression">UNKNOWN</span>
+  </div>
+
+  <div class="info">
+    <span>Scanner</span>
+    <span id="scanner" class="off">OFF</span>
+  </div>
+
+  <h3>WIDE EYE DETECTIONS</h3>
+  <div class="counter" id="count">0</div>
+
+  <div class="status" id="result">
+    Waiting for AI...
   </div>
 </div>
 
-<script>
-let stream = null;
+<script type="module">
+import {
+  FilesetResolver,
+  FaceLandmarker
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs";
 
-async function startCamera() {
+const video = document.getElementById("camera");
+const statusText = document.getElementById("status");
+
+let stream = null;
+let landmarker = null;
+let running = false;
+let animationId = null;
+let count = 0;
+let lastTrigger = 0;
+let lastVideoTime = -1;
+
+const $ = id => document.getElementById(id);
+
+function setStatus(id, message, active) {
+  $(id).textContent = message;
+  $(id).className = active ? "on" : "off";
+}
+
+async function startScanner() {
   try {
+    $("start").disabled = true;
+    statusText.textContent = "LOADING AI MODEL...";
+
+    const vision = await FilesetResolver.forVisionTasks(
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+    );
+
+    landmarker = await FaceLandmarker.createFromOptions(
+      vision,
+      {
+        baseOptions: {
+          modelAssetPath:
+            "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+          delegate: "CPU"
+        },
+        runningMode: "VIDEO",
+        numFaces: 1,
+        outputFaceBlendshapes: true
+      }
+    );
+
     stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: "user"
-      },
+      video: { facingMode: "user" },
       audio: false
     });
 
-    document.getElementById("camera").srcObject = stream;
+    video.srcObject = stream;
+    await video.play();
 
-    document.getElementById("status").textContent =
-      "CAMERA ACTIVE";
+    running = true;
 
-    document.getElementById("cameraStatus").textContent =
-      "ON";
+    setStatus("scanner", "ACTIVE", true);
+    statusText.textContent = "AI SCANNER ACTIVE";
 
-    document.getElementById("cameraStatus").className = "on";
+    detectLoop();
 
   } catch (error) {
-    document.getElementById("status").textContent =
-      "CAMERA ERROR: " + error.message;
+    statusText.textContent = "ERROR: " + error.message;
+    $("start").disabled = false;
   }
 }
 
-function stopCamera() {
+function detectLoop() {
+  if (!running) return;
+
+  if (
+    video.readyState >= 2 &&
+    video.currentTime !== lastVideoTime
+  ) {
+    lastVideoTime = video.currentTime;
+
+    const result = landmarker.detectForVideo(
+      video,
+      performance.now()
+    );
+
+    const faces = result.faceLandmarks;
+
+    if (faces && faces.length > 0) {
+      setStatus("face", "DETECTED", true);
+      setStatus("eye", "TRACKING", true);
+
+      const categories =
+        result.faceBlendshapes?.[0]?.categories || [];
+
+      const getScore = name =>
+        categories.find(item => item.categoryName === name)?.score || 0;
+
+      const leftWide = getScore("eyeWideLeft");
+      const rightWide = getScore("eyeWideRight");
+
+      const wideScore = (leftWide + rightWide) / 2;
+
+      $("expression").textContent =
+        wideScore.toFixed(2);
+
+      if (wideScore > 0.45) {
+        $("result").textContent =
+          "WIDE EYE DETECTED!";
+
+        const now = performance.now();
+
+        if (now - lastTrigger > 2000) {
+          count++;
+          $("count").textContent = count;
+          lastTrigger = now;
+        }
+      } else {
+        $("result").textContent =
+          "NORMAL EYE EXPRESSION";
+      }
+
+    } else {
+      setStatus("face", "NOT FOUND", false);
+      setStatus("eye", "WAITING", false);
+      $("expression").textContent = "UNKNOWN";
+      $("result").textContent = "Position your face in camera";
+    }
+  }
+
+  animationId = requestAnimationFrame(detectLoop);
+}
+
+function stopScanner() {
+  running = false;
+
+  if (animationId) {
+    cancelAnimationFrame(animationId);
+    animationId = null;
+  }
+
   if (stream) {
     stream.getTracks().forEach(track => track.stop());
     stream = null;
   }
 
-  document.getElementById("camera").srcObject = null;
-  document.getElementById("status").textContent =
-    "CAMERA STOPPED";
+  if (landmarker) {
+    landmarker.close();
+    landmarker = null;
+  }
 
-  document.getElementById("cameraStatus").textContent =
-    "OFF";
+  video.srcObject = null;
 
-  document.getElementById("cameraStatus").className = "off";
+  setStatus("face", "WAITING", false);
+  setStatus("eye", "WAITING", false);
+  setStatus("scanner", "OFF", false);
+
+  statusText.textContent = "SCANNER STOPPED";
+  $("start").disabled = false;
 }
-</script>
 
+$("start").addEventListener("click", startScanner);
+$("stop").addEventListener("click", stopScanner);
+
+</script>
 </body>
 </html>
