@@ -1,0 +1,194 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JX EYE SCROLL</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #090612;
+  color: white;
+  font-family: Arial, sans-serif;
+  padding: 20px;
+}
+
+header {
+  text-align: center;
+  color: #bb86fc;
+  font-size: 25px;
+  font-weight: bold;
+  margin: 15px 0 25px;
+}
+
+.subtitle {
+  text-align: center;
+  color: #aaa;
+  font-size: 12px;
+  margin-bottom: 25px;
+}
+
+.camera {
+  background: #1b1230;
+  border: 1px solid #7543b5;
+  border-radius: 20px;
+  padding: 15px;
+  text-align: center;
+}
+
+video {
+  width: 100%;
+  border-radius: 12px;
+  background: #080510;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.status {
+  color: #c084fc;
+  margin: 15px 0;
+  font-size: 13px;
+}
+
+button {
+  width: 100%;
+  border: none;
+  padding: 15px;
+  border-radius: 12px;
+  background: #8b42d6;
+  color: white;
+  font-weight: bold;
+  font-size: 15px;
+  margin-top: 10px;
+}
+
+button:active {
+  background: #6426a5;
+}
+
+.panel {
+  background: #171025;
+  border-radius: 15px;
+  padding: 17px;
+  margin-top: 18px;
+}
+
+.panel h3 {
+  color: #c084fc;
+  font-size: 15px;
+}
+
+.info {
+  display: flex;
+  justify-content: space-between;
+  margin: 15px 0;
+  color: #ccc;
+  font-size: 13px;
+}
+
+.off {
+  color: #ff7777;
+}
+
+.on {
+  color: #64e6a0;
+}
+</style>
+</head>
+
+<body>
+
+<header>JX EYE SCROLL</header>
+
+<div class="subtitle">
+AI POWERED EYE GESTURE CONTROL
+</div>
+
+<div class="camera">
+  <video id="camera" autoplay playsinline muted></video>
+
+  <div class="status" id="status">
+    CAMERA NOT STARTED
+  </div>
+
+  <button onclick="startCamera()">
+    START CAMERA
+  </button>
+
+  <button onclick="stopCamera()">
+    STOP CAMERA
+  </button>
+</div>
+
+<div class="panel">
+  <h3>SYSTEM STATUS</h3>
+
+  <div class="info">
+    <span>Camera</span>
+    <span id="cameraStatus" class="off">OFF</span>
+  </div>
+
+  <div class="info">
+    <span>Eye Detection</span>
+    <span class="off">NOT CONNECTED</span>
+  </div>
+
+  <div class="info">
+    <span>Auto Scroll</span>
+    <span class="off">DISABLED</span>
+  </div>
+</div>
+
+<script>
+let stream = null;
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: "user"
+      },
+      audio: false
+    });
+
+    document.getElementById("camera").srcObject = stream;
+
+    document.getElementById("status").textContent =
+      "CAMERA ACTIVE";
+
+    document.getElementById("cameraStatus").textContent =
+      "ON";
+
+    document.getElementById("cameraStatus").className = "on";
+
+  } catch (error) {
+    document.getElementById("status").textContent =
+      "CAMERA ERROR: " + error.message;
+  }
+}
+
+function stopCamera() {
+  if (stream) {
+    stream.getTracks().forEach(track => track.stop());
+    stream = null;
+  }
+
+  document.getElementById("camera").srcObject = null;
+  document.getElementById("status").textContent =
+    "CAMERA STOPPED";
+
+  document.getElementById("cameraStatus").textContent =
+    "OFF";
+
+  document.getElementById("cameraStatus").className = "off";
+}
+</script>
+
+</body>
+</html>
